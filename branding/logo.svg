@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-12 -12 829 679" width="829" height="679">
+  <defs>
+    <linearGradient id="fold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0057A1" stop-opacity="0"/>
+      <stop offset="1" stop-color="#022F5E"/>
+    </linearGradient>
+  </defs>
+  <polygon fill="#00B6F5" points="12,0 518,525 395,645 8,243"/>
+  <polygon fill="#00B6F5" points="376,8 588,225 462,345 372,253"/>
+  <polygon fill="#0057A1" points="588,225 803,18 800,258 705,348"/>
+  <polygon fill="url(#fold)" points="628,262 690,290 705,348"/>
+  <polygon fill="#0F73AE" points="588,225 705,348 580,470 462,345"/>
+</svg>

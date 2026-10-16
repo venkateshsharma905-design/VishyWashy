@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Call-time audio capture (only after DPDP consent is recorded, only during calls). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- WebSocket to the edge inference server. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Loudspeaker during calls, and muting the microphone when a fraud hold has no Hold button. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <!-- Optional: bring the in-call screen forward to switch on the loudspeaker. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
+    <!-- Optional: TelecomManager.endCall() from the Alert card's "Hang up". -->
+    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+
+    <!-- Optional: read the caller's number so whitelisted contacts skip monitoring. -->
+    <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
+
+    <!-- Android 13+: show the "report this flagged call" notification after a call. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Asks to be exempt from battery optimisation, so the phone doesn't stop the call-protection
+         service in the background (common on OnePlus / Oppo / Xiaomi). -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- Optional: "Report 1930" opens the dialer with the number pre-filled. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.PICK" />
+            <data android:mimeType="vnd.android.cursor.dir/phone_v2" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="smsto" />
+        </intent>
+    </queries>
+
+    <uses-feature android:name="android.hardware.microphone" android:required="true" />
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Material3.DynamicColors.DayNight.NoActionBar"
+        android:usesCleartextTraffic="${usesCleartextTraffic}">
+
+        <activity
+            android:name=".HudControlActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+            Accessibility service: the only non-system way to capture audio during a call and to
+            draw above the dialer. It does nothing between calls.
+        -->
+        <service
+            android:name=".call.CallGuardService"
+            android:exported="true"
+            android:label="@string/accessibility_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/callguard_accessibility" />
+        </service>
+
+        <activity
+            android:name=".call.ReportActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- Shares the temporary scam-call recording with the cyber cell. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+</manifest>

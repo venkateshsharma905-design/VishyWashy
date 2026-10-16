@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Temporary scam-call recordings shared with the cyber cell; deleted after sharing. -->
+    <cache-path name="reports" path="reports/" />
+</paths>

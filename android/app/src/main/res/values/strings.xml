@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VishyWashy</string>
+    <string name="accessibility_label">VishyWashy call protection</string>
+    <string name="accessibility_description">VishyWashy listens only while a call is connected and protection is armed. It shows a scam-risk indicator above the dialer and, if you allow it, switches the call to loudspeaker so both voices can be analysed. It does not read your screen for any other purpose.</string>
+</resources>

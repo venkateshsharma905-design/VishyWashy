@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- VishyWashy logo (vector, sharp at any size). Source: branding/logo.svg -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="80.5dp" android:height="65.5dp"
+    android:viewportWidth="805" android:viewportHeight="655">
+    <path android:fillColor="#00B6F5" android:pathData="M12,0 L518,525 L395,645 L8,243 Z"/>
+    <path android:fillColor="#00B6F5" android:pathData="M376,8 L588,225 L462,345 L372,253 Z"/>
+    <path android:fillColor="#0057A1" android:pathData="M588,225 L803,18 L800,258 L705,348 Z"/>
+    <path android:pathData="M628,262 L690,290 L705,348 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="628" android:startY="262" android:endX="705" android:endY="348">
+                <item android:offset="0" android:color="#000057A1"/>
+                <item android:offset="1" android:color="#FF022F5E"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:fillColor="#0F73AE" android:pathData="M588,225 L705,348 L580,470 L462,345 Z"/>
+</vector>

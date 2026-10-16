@@ -1,0 +1,22 @@
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Android / Gradle
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+*.iml
+.idea/
+
+# Call recordings saved by DHVANI_DEBUG_DIR (troubleshooting only — never commit)
+debug_calls/
+
+# Archives and OS clutter
+*.zip
+.DS_Store

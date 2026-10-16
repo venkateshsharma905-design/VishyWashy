@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%22-12%20-12%20829%20679%22%20width%3D%22829%22%20height%3D%22679%22%3E%20%3Cdefs%3E%20%3ClinearGradient%20id%3D%22fold%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%230057A1%22%20stop-opacity%3D%220%22/%3E%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23022F5E%22/%3E%20%3C/linearGradient%3E%20%3C/defs%3E%20%3Cpolygon%20fill%3D%22%2300B6F5%22%20points%3D%2212%2C0%20518%2C525%20395%2C645%208%2C243%22/%3E%20%3Cpolygon%20fill%3D%22%2300B6F5%22%20points%3D%22376%2C8%20588%2C225%20462%2C345%20372%2C253%22/%3E%20%3Cpolygon%20fill%3D%22%230057A1%22%20points%3D%22588%2C225%20803%2C18%20800%2C258%20705%2C348%22/%3E%20%3Cpolygon%20fill%3D%22url%28%23fold%29%22%20points%3D%22628%2C262%20690%2C290%20705%2C348%22/%3E%20%3Cpolygon%20fill%3D%22%230F73AE%22%20points%3D%22588%2C225%20705%2C348%20580%2C470%20462%2C345%22/%3E%20%3C/svg%3E%20">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VishyWashy SOC Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'system-ui', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        },
+      },
+    },
+  };
+</script>
+<style>
+  :root {
+    --surface-0: #0b1120;          /* page */
+    --surface-1: #0f172a;          /* slate-900 panels */
+    --surface-2: #1e293b;          /* slate-800 insets */
+    --border:    #1e293b;
+    --text-primary:   #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted:     #64748b;
+    --series:   #3987e5;           /* single magnitude series */
+    /* Status palette — reserved for risk state, always paired with icon + label */
+    --good:     #0ca30c;
+    --warning:  #fab219;
+    --critical: #d03b3b;
+  }
+  html, body { background: var(--surface-0); color: var(--text-primary); }
+  body { font-feature-settings: "cv11", "ss01"; }
+  .panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; }
+  .panel-title { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--text-secondary); }
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  /* Gauge */
+  .gauge-progress { transition: stroke-dashoffset .7s cubic-bezier(.2,.8,.2,1), stroke .4s ease; }
+  .gauge-glow { transition: stroke-dashoffset .7s cubic-bezier(.2,.8,.2,1), stroke .4s ease, opacity .4s ease; filter: blur(6px); }
+
+  /* Status dots */
+  @keyframes ping-soft { 0% { box-shadow: 0 0 0 0 currentColor; } 70% { box-shadow: 0 0 0 6px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+  .live-dot { width: 8px; height: 8px; border-radius: 9999px; background: currentColor; }
+  .live-dot.pulse { animation: ping-soft 1.8s infinite; }
+
+  /* Scroll panes */
+  .scroll-pane { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+  .scroll-pane::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scroll-pane::-webkit-scrollbar-thumb { background: #334155; border-radius: 8px; }
+  .scroll-pane::-webkit-scrollbar-track { background: transparent; }
+
+  /* JSON syntax colours (text tokens, not status colours) */
+  .j-key  { color: #7dd3fc; }
+  .j-str  { color: #c4b5fd; }
+  .j-num  { color: #fde68a; }
+  .j-bool { color: #f9a8d4; }
+  .j-null { color: #64748b; }
+
+  /* Transcript chat bubbles: speaker identity (not risk status), always labelled in text */
+  .turn { display: flex; flex-direction: column; max-width: 86%; }
+  .turn-you { align-self: flex-end; align-items: flex-end; }
+  .turn-caller { align-self: flex-start; align-items: flex-start; }
+  .bubble { border-radius: 14px; padding: 7px 11px; line-height: 1.5; border: 1px solid; }
+  .turn-you .bubble { background: rgba(57,135,229,.12); border-color: rgba(57,135,229,.35); border-bottom-right-radius: 4px; }
+  .turn-caller .bubble { background: rgba(148,163,184,.08); border-color: #334155; border-bottom-left-radius: 4px; }
+  .turn-meta { font-size: 10.5px; color: #64748b; margin: 0 4px 2px; display: flex; gap: 6px; align-items: baseline; }
+  .who { font-weight: 700; letter-spacing: .02em; }
+  .turn-you .who { color: #7cb3f5; }
+  .turn-caller .who { color: #e2e8f0; }
+  .turn.provisional .bubble { border-style: dashed; }
+  .turn.live .bubble { border-style: dashed; opacity: .75; }
+  .live-dots::after { content: '…'; animation: blink 1s steps(2, end) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Transcript highlight */
+  mark.hit { background: rgba(208,59,59,.18); color: #fecaca; border-bottom: 1px solid var(--critical); border-radius: 3px; padding: 0 2px; }
+  /* The caller's scam words matter most: solid, bold. The owner's own words: outline only. */
+  .turn-caller mark.hit { background: #b91c1c; color: #fff; font-weight: 700; border-bottom: 2px solid #fca5a5; }
+  .turn-you mark.hit { background: transparent; color: #fca5a5; border: 1px dashed rgba(208,59,59,.6); }
+
+  /* Alert strip */
+  #alert-strip { transition: transform .45s cubic-bezier(.2,.8,.2,1), opacity .3s ease; }
+  #alert-strip.hidden-strip { transform: translateY(110%); opacity: 0; pointer-events: none; }
+  @keyframes alert-sheen { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  .alert-sheen { animation: alert-sheen 2.4s ease-in-out infinite; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gauge-progress, .gauge-glow, #alert-strip { transition: none; }
+    .live-dot.pulse, .alert-sheen { animation: none; }
+  }
+</style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+
+<!-- ════════════════════════════════ HIGH-RISK ALERT STRIP ════════════════════════════════ -->
+<div id="alert-strip" class="hidden-strip fixed bottom-0 inset-x-0 z-50 shadow-[0_-12px_40px_rgba(0,0,0,.5)]" role="alert" aria-live="assertive">
+  <div class="relative overflow-hidden" style="background:linear-gradient(90deg,#7f1d1d 0%,#b91c1c 55%,#7f1d1d 100%)">
+    <div class="alert-sheen absolute inset-0" style="background:radial-gradient(60% 120% at 50% 100%,rgba(255,255,255,.12),transparent 70%)"></div>
+    <div class="relative max-w-[1680px] mx-auto px-4 sm:px-6 py-3 flex flex-col md:flex-row md:items-center gap-3">
+      <div class="flex items-center gap-3 min-w-0 flex-1">
+        <svg class="w-8 h-8 shrink-0 text-white" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2 4 5v6c0 5.25 3.4 9.74 8 11 4.6-1.26 8-5.75 8-11V5l-8-3zm-1 5h2v6h-2V7zm0 8h2v2h-2v-2z"/></svg>
+        <div class="min-w-0">
+          <div class="font-extrabold tracking-tight text-white">HIGH RISK — probable vishing / scam call</div>
+          <div id="alert-detail" class="text-sm text-red-100/90 truncate">Strong indicators detected in the current window.</div>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="btn-alert-terminate" class="h-10 px-4 rounded-full bg-white text-red-700 font-bold text-sm hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">Terminate session</button>
+        <a href="tel:1930" class="h-10 px-4 rounded-full border border-white/70 text-white font-semibold text-sm inline-flex items-center hover:bg-white/10">Report · 1930</a>
+        <a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer" class="h-10 px-3 rounded-full text-white/90 text-sm inline-flex items-center hover:bg-white/10">cybercrime.gov.in ↗</a>
+        <button id="btn-alert-dismiss" class="h-10 w-10 rounded-full text-white/80 hover:bg-white/10 inline-flex items-center justify-center" aria-label="Dismiss alert">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════ HEADER ════════════════════════════════════ -->
+<header class="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/85 backdrop-blur-md">
+  <div class="max-w-[1680px] mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center gap-x-6 gap-y-3">
+    <div class="flex items-center gap-3 mr-auto">
+      <svg class="w-10 h-9 shrink-0" viewBox="-12 -12 829 679" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+    <linearGradient id="fold-hdr" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0057A1" stop-opacity="0"/>
+      <stop offset="1" stop-color="#022F5E"/>
+    </linearGradient>
+  </defs>
+  <polygon fill="#00B6F5" points="12,0 518,525 395,645 8,243"/>
+  <polygon fill="#00B6F5" points="376,8 588,225 462,345 372,253"/>
+  <polygon fill="#0057A1" points="588,225 803,18 800,258 705,348"/>
+  <polygon fill="url(#fold-hdr)" points="628,262 690,290 705,348"/>
+  <polygon fill="#0F73AE" points="588,225 705,348 580,470 462,345"/></svg>
+      <div>
+        <h1 class="text-[15px] font-bold tracking-tight leading-tight">VishyWashy <span class="text-slate-500 font-medium">SOC</span></h1>
+        <p class="text-[11px] text-slate-500 leading-tight">Scam-call intent detection · defensive evaluation console</p>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2 text-xs">
+      <label class="inline-flex items-center gap-2 h-7 pl-3 pr-1 rounded-full bg-slate-800/80 border border-slate-700 text-slate-400">
+        Source
+        <select id="source-select" class="h-6 max-w-[220px] rounded-full bg-slate-900 border border-slate-700 text-slate-200 text-xs px-2 focus:outline-none focus:ring-2 focus:ring-sky-600" aria-label="Telemetry source">
+          <option value="self">This browser</option>
+        </select>
+      </label>
+      <label class="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-slate-800/80 border border-slate-700 text-slate-400 cursor-pointer" title="Switch to a phone automatically when it starts streaming">
+        <input id="auto-follow" type="checkbox" class="accent-sky-500" checked> Auto-follow phone
+      </label>
+      <span id="chip-phone" class="hidden inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-sky-950/60 border border-sky-800 text-sky-200" title="Enter this in the Android app's server address field">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 1H7a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm0 18H7V5h10v14z"/></svg>
+        Phone → <code id="phone-addr" class="font-mono"></code>
+      </span>
+      <span id="chip-ws" class="inline-flex items-center gap-2 h-7 px-3 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300">
+        <span class="live-dot" style="color:var(--text-muted)"></span><span id="ws-label">Disconnected</span>
+      </span>
+      <span id="chip-asr" class="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300" title="Stream B transcription status">ASR · —</span>
+      <span class="inline-flex items-center gap-2 h-7 px-3 rounded-full bg-slate-800/80 border border-slate-700 text-slate-400">
+        Session <code id="session-id" class="font-mono text-sky-300">—</code>
+      </span>
+      <span class="inline-flex items-center gap-2 h-7 px-3 rounded-full bg-slate-800/80 border border-slate-700 text-slate-400 font-mono tabular" id="uptime">00:00:00</span>
+    </div>
+  </div>
+</header>
+
+<div id="watch-banner" class="hidden max-w-[1680px] mx-auto px-4 sm:px-6 pt-4">
+  <div class="flex flex-wrap items-center gap-3 rounded-xl border border-sky-900 bg-sky-950/40 px-4 py-2.5 text-sm text-sky-100">
+    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 1H7a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm0 18H7V5h10v14z"/></svg>
+    <span id="watch-text" class="min-w-0 flex-1">Watching a remote session (read-only).</span>
+    <button id="btn-watch-self" class="h-8 px-3 rounded-lg border border-sky-800 hover:bg-sky-900/60 text-xs">Back to this browser</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════ MAIN ════════════════════════════════════ -->
+<main class="max-w-[1680px] mx-auto px-4 sm:px-6 py-5 grid grid-cols-1 xl:grid-cols-12 gap-4">
+
+  <!-- ─────────── Column A: risk posture ─────────── -->
+  <section class="xl:col-span-4 flex flex-col gap-4">
+
+    <!-- Risk gauge -->
+    <div class="panel p-5">
+      <div class="flex items-center justify-between">
+        <h2 class="panel-title">Fused risk score</h2>
+        <span id="frame-badge" class="font-mono text-[11px] text-slate-500 tabular">frame —</span>
+      </div>
+
+      <div class="relative mx-auto mt-2 w-full max-w-[300px] aspect-square">
+        <svg viewBox="0 0 220 220" class="w-full h-full" role="img" aria-labelledby="gauge-title">
+          <title id="gauge-title">Risk score gauge</title>
+          <g transform="rotate(135 110 110)">
+            <!-- track -->
+            <circle cx="110" cy="110" r="88" fill="none" stroke="#1e293b" stroke-width="14" stroke-linecap="round"
+                    stroke-dasharray="414.69 552.92"/>
+            <!-- glow + progress (0.75 of circumference = 414.69) -->
+            <circle id="gauge-glow" class="gauge-glow" cx="110" cy="110" r="88" fill="none" stroke="var(--good)" stroke-width="14"
+                    stroke-linecap="round" stroke-dasharray="414.69 552.92" stroke-dashoffset="414.69" opacity=".45"/>
+            <circle id="gauge-progress" class="gauge-progress" cx="110" cy="110" r="88" fill="none" stroke="var(--good)" stroke-width="14"
+                    stroke-linecap="round" stroke-dasharray="414.69 552.92" stroke-dashoffset="414.69"/>
+          </g>
+          <!-- threshold ticks are drawn by JS -->
+          <g id="gauge-ticks"></g>
+        </svg>
+        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <div class="flex items-baseline">
+            <span id="score-num" class="text-6xl font-extrabold tracking-tight tabular">0</span>
+            <span class="text-2xl font-bold text-slate-500 ml-0.5">%</span>
+          </div>
+          <div id="level-pill" class="mt-2 inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-xs font-bold tracking-wider bg-slate-800 text-slate-400">
+            <span id="level-icon" aria-hidden="true">•</span><span id="level-label">STANDBY</span>
+          </div>
+          <div id="speech-flag" class="mt-2 text-[11px] text-slate-500">no audio</div>
+        </div>
+      </div>
+
+      <div class="mt-1 grid grid-cols-3 text-center text-[11px] text-slate-500">
+        <div><span class="inline-block w-2 h-2 rounded-full mr-1 align-middle" style="background:var(--good)"></span>Low &lt; 35</div>
+        <div><span class="inline-block w-2 h-2 rounded-full mr-1 align-middle" style="background:var(--warning)"></span>Medium ≥ 35</div>
+        <div><span class="inline-block w-2 h-2 rounded-full mr-1 align-middle" style="background:var(--critical)"></span>High ≥ 70</div>
+      </div>
+    </div>
+
+    <!-- Stream decomposition -->
+    <div class="panel p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="panel-title">Risk breakdown</h2>
+        <span class="font-mono text-[11px] text-slate-500" id="weights-label">R = (β·I + γ·K) / (β + γ)</span>
+      </div>
+      <div class="space-y-4" id="streams"></div>
+    </div>
+
+    <!-- Guidance -->
+    <div class="panel p-5">
+      <h2 class="panel-title mb-2">Analyst guidance</h2>
+      <p id="guidance" class="text-sm leading-relaxed text-slate-300">Awaiting first analysis window…</p>
+    </div>
+  </section>
+
+  <!-- ─────────── Column B: telemetry ─────────── -->
+  <section class="xl:col-span-8 flex flex-col gap-4 min-w-0">
+
+    <!-- KPI tiles -->
+    <div class="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-3" id="kpis"></div>
+
+    <!-- Timeline -->
+    <div class="panel p-5">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h2 class="panel-title">Risk score · last 60 s</h2>
+        <span class="text-[11px] text-slate-500">500 ms resolution · dashed lines are risk thresholds</span>
+      </div>
+      <div class="relative" id="timeline-wrap">
+        <svg id="timeline" class="w-full h-[180px] block" preserveAspectRatio="none" role="img" aria-label="Risk score over time"></svg>
+        <div id="timeline-tip" class="hidden absolute z-10 pointer-events-none rounded-lg border border-slate-700 bg-slate-950/95 px-3 py-2 text-xs shadow-xl"></div>
+      </div>
+    </div>
+
+    <!-- Transcript + indicators -->
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 min-w-0">
+      <div class="panel p-5 lg:col-span-3 flex flex-col min-w-0">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="panel-title">Live transcript</h2>
+          <div class="flex items-center gap-2 text-[11px] text-slate-500">
+            <span id="voiceprint-chip" class="hidden px-2 py-0.5 rounded-full border border-sky-800 text-sky-300" title="The phone sent the owner's voiceprint: lines are matched to the owner's voice">Voiceprint ✓</span>
+            <span id="asr-lat" title="First text after speech ends · refined text">ASR —</span>
+            <button id="btn-swap-speakers" class="h-7 px-2.5 rounded-md border border-slate-700 hover:bg-slate-800 text-slate-300" title="If You and Caller are the wrong way round for this phone, swap them">Swap You ⇄ Caller</button>
+            <button id="btn-clear-transcript" class="h-7 px-2.5 rounded-md border border-slate-700 hover:bg-slate-800 text-slate-300">Clear</button>
+          </div>
+        </div>
+        <div id="transcript" class="scroll-pane flex flex-col gap-2.5 font-mono text-[13px] leading-6 bg-slate-950/60 border border-slate-800 rounded-lg p-3 h-[280px] overflow-y-auto" aria-live="polite">
+          <div class="text-slate-600 italic">Waiting for speech…</div>
+        </div>
+        <form id="inject-form" class="mt-3 flex gap-2">
+          <input id="inject-text" type="text" maxlength="2000" autocomplete="off"
+                 class="flex-1 min-w-0 h-10 px-3 rounded-lg bg-slate-950/60 border border-slate-700 font-mono text-[13px] placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-600"
+                 placeholder="Inject a reference transcript (benchmark eval)…">
+          <button class="h-10 px-4 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm font-semibold">Send</button>
+        </form>
+      </div>
+
+      <div class="panel p-5 lg:col-span-2 flex flex-col min-w-0">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="panel-title">Detected indicators</h2>
+          <span id="ind-count" class="font-mono text-[11px] text-slate-500">0 unique</span>
+        </div>
+        <div id="indicators" class="scroll-pane flex-1 overflow-y-auto h-[280px] space-y-2">
+          <div class="text-slate-600 text-sm italic">None yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Telemetry log + capture -->
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 min-w-0">
+      <div class="panel p-5 lg:col-span-3 flex flex-col min-w-0">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="panel-title">Telemetry stream</h2>
+          <div class="flex items-center gap-2 text-[11px]">
+            <span id="log-count" class="font-mono text-slate-500">0 events</span>
+            <button id="btn-log-pause" class="h-7 px-2.5 rounded-md border border-slate-700 hover:bg-slate-800 text-slate-300" aria-pressed="false">Pause</button>
+            <button id="btn-log-clear" class="h-7 px-2.5 rounded-md border border-slate-700 hover:bg-slate-800 text-slate-300">Clear</button>
+          </div>
+        </div>
+        <div id="log" class="scroll-pane font-mono text-[11.5px] leading-[1.65] bg-slate-950/60 border border-slate-800 rounded-lg p-3 h-[260px] overflow-auto whitespace-pre"></div>
+      </div>
+
+      <div class="panel p-5 lg:col-span-2 flex flex-col gap-4">
+        <h2 class="panel-title">Audio source</h2>
+
+        <div class="flex items-center gap-4">
+          <button id="btn-mic" class="relative w-14 h-14 shrink-0 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center hover:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500" aria-pressed="false" aria-label="Start microphone">
+            <svg id="mic-icon" class="w-6 h-6 text-slate-300" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>
+          </button>
+          <div class="flex-1 min-w-0">
+            <div id="mic-label" class="text-sm font-semibold text-slate-200">Microphone idle</div>
+            <div class="mt-2 h-2 rounded-full bg-slate-800 overflow-hidden">
+              <div id="level-bar" class="h-full rounded-full transition-[width] duration-100" style="width:0%;background:var(--series)"></div>
+            </div>
+            <div id="level-db" class="mt-1 font-mono text-[11px] text-slate-500 tabular">— dBFS</div>
+          </div>
+        </div>
+
+        <div class="border-t border-slate-800 pt-4">
+          <label class="text-xs text-slate-400" for="file-input">Stream a benchmark file (WAV / FLAC / MP3)</label>
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <input id="file-input" type="file" accept="audio/*,.wav,.flac" class="block w-full text-xs text-slate-400 file:mr-3 file:h-9 file:px-3 file:rounded-lg file:border file:border-slate-700 file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700">
+            <select id="file-speed" class="h-9 px-2 rounded-lg bg-slate-800 border border-slate-700 text-xs" aria-label="Playback speed">
+              <option value="1">1× real-time</option>
+              <option value="2">2×</option>
+              <option value="4">4×</option>
+            </select>
+            <button id="btn-file" class="h-9 px-4 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold disabled:opacity-40" disabled>Stream file</button>
+          </div>
+          <div class="mt-2 h-1.5 rounded-full bg-slate-800 overflow-hidden"><div id="file-progress" class="h-full rounded-full" style="width:0%;background:var(--series)"></div></div>
+          <div id="file-label" class="mt-1 font-mono text-[11px] text-slate-500">No file loaded</div>
+        </div>
+
+        <div class="border-t border-slate-800 pt-4 flex flex-wrap gap-2">
+          <button id="btn-reset" class="h-9 px-3 rounded-lg border border-slate-700 hover:bg-slate-800 text-xs text-slate-200">Reset window</button>
+          <button id="btn-terminate" class="h-9 px-3 rounded-lg border border-red-900 bg-red-950/40 hover:bg-red-900/40 text-xs text-red-200">Terminate session</button>
+          <a id="link-summary" target="_blank" rel="noopener" class="h-9 px-3 rounded-lg border border-slate-700 hover:bg-slate-800 text-xs text-slate-200 inline-flex items-center">Session summary ↗</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="max-w-[1680px] mx-auto px-4 sm:px-6 pb-28 text-[11px] text-slate-600">
+  Defensive evaluation tool. Audio is analysed in memory; the server stores scores and indicator tags only.
+</footer>
+
+<script>
+'use strict';
+// ════════════════════════════════════════════════════════════════════════
+// §1  Configuration & state
+// ════════════════════════════════════════════════════════════════════════
+const TARGET_SR = 16000;
+const HOP_SAMPLES = 8000;              // 500 ms @ 16 kHz
+const TIMELINE_POINTS = 120;           // 60 s at 500 ms
+const LOG_MAX = 400;
+const TRANSCRIPT_MAX = 300;
+const RECONNECT_BASE = 1000, RECONNECT_MAX = 15000;
+const THRESH = { medium: 0.35, high: 0.70 };
+
+const LEVELS = {
+  LOW:     { color: 'var(--good)',     hex: '#0ca30c', label: 'LOW',     icon: '✓', pill: 'bg-emerald-950/70 text-emerald-300 ring-1 ring-emerald-800' },
+  MEDIUM:  { color: 'var(--warning)',  hex: '#fab219', label: 'MEDIUM',  icon: '!', pill: 'bg-amber-950/70 text-amber-300 ring-1 ring-amber-800' },
+  HIGH:    { color: 'var(--critical)', hex: '#d03b3b', label: 'HIGH',    icon: '▲', pill: 'bg-red-950/70 text-red-300 ring-1 ring-red-800' },
+  STANDBY: { color: 'var(--text-muted)', hex: '#64748b', label: 'STANDBY', icon: '•', pill: 'bg-slate-800 text-slate-400' },
+};
+
+const CATEGORY_LABEL = {
+  urgency: 'Urgency',
+  financial_credential_request: 'Credential request',
+  unverified_authority_claim: 'Authority claim',
+  threat_or_coercion: 'Threat / coercion',
+  pii_request: 'PII request',
+  verification_bypass: 'Verification bypass',
+};
+
+const params = new URLSearchParams(location.search);
+const serverHost = params.get('server') || location.host || 'localhost:8000';
+const wsScheme = location.protocol === 'https:' ? 'wss' : 'ws';
+const httpScheme = location.protocol === 'https:' ? 'https' : 'http';
+
+const state = {
+  sessionId: newSessionId(),
+  ws: null,
+  reconnectDelay: RECONNECT_BASE,
+  reconnectTimer: null,
+  connectedAt: null,
+  rttMs: null,
+  pingTimer: null,
+  timeline: [],
+  latencies: [],
+  highFrames: 0,
+  lastFrame: 0,
+  lastLevel: 'STANDBY',
+  alertDismissedAtFrame: -1,
+  indicators: new Map(),               // tag -> {phrase, category, weight, count, last}
+  hitPhrases: new Set(),
+  transcript: [],
+  logPaused: false,
+  logCount: 0,
+  // capture
+  capturing: false,
+  audioCtx: null, micStream: null, workletNode: null, procNode: null, srcNode: null,
+  resampler: null, pending: new Float32Array(0),
+  // file streaming
+  fileSamples: null, fileTimer: null, fileOffset: 0,
+  // monitoring
+  viewing: 'self',                     // 'self' or a remote session id
+  monitorWs: null,
+  monitorDelay: RECONNECT_BASE,
+  remote: new Map(),                   // session_id -> descriptor
+  speakerLabels: {},                   // voice id -> "You" | "Caller" | "Caller 2" (relabelled live)
+  partial: null,                       // live text of the utterance in progress
+};
+
+function newSessionId() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(6)), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+const $ = id => document.getElementById(id);
+
+// ════════════════════════════════════════════════════════════════════════
+// §2  Utilities
+// ════════════════════════════════════════════════════════════════════════
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const clamp01 = v => Math.min(1, Math.max(0, Number.isFinite(v) ? v : 0));
+const fmtTime = d => d.toLocaleTimeString([], { hour12: false });
+const levelOf = score => score >= THRESH.high ? 'HIGH' : score >= THRESH.medium ? 'MEDIUM' : 'LOW';
+
+function nearBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight < 48; }
+
+function percentile(arr, p) {
+  if (!arr.length) return null;
+  const s = [...arr].sort((a, b) => a - b);
+  return s[Math.min(s.length - 1, Math.floor(p * (s.length - 1) + 0.5))];
+}
+
+function highlightJson(obj) {
+  return esc(JSON.stringify(obj)).replace(
+    /(&quot;(?:[^&]|&(?!quot;))*?&quot;)(\s*:)?|\b(true|false)\b|\bnull\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g,
+    (m, str, colon, bool) => {
+      if (str) return colon ? `<span class="j-key">${str}</span>${colon}` : `<span class="j-str">${str}</span>`;
+      if (bool) return `<span class="j-bool">${m}</span>`;
+      if (m === 'null') return `<span class="j-null">null</span>`;
+      return `<span class="j-num">${m}</span>`;
+    });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// §3  Static UI scaffolding (KPIs, streams, gauge ticks)
+// ════════════════════════════════════════════════════════════════════════
+const KPI_DEFS = [
+  { id: 'lat',    label: 'Engine latency', unit: 'ms' },
+  { id: 'p95',    label: 'Latency p95',    unit: 'ms' },
+  { id: 'rtt',    label: 'Network RTT',    unit: 'ms' },
+  { id: 'asr',    label: 'ASR latency',    unit: 'ms' },
+  { id: 'frames', label: 'Windows',        unit: '' },
+  { id: 'high',   label: 'High-risk',      unit: 'windows' },
+];
+$('kpis').innerHTML = KPI_DEFS.map(k => `
+  <div class="panel px-4 py-3">
+    <div class="text-[10.5px] uppercase tracking-[.12em] text-slate-500 font-semibold">${k.label}</div>
+    <div class="mt-1 flex items-baseline gap-1">
+      <span id="kpi-${k.id}" class="text-2xl font-bold tabular text-slate-100">—</span>
+      <span class="text-xs text-slate-500">${k.unit}</span>
+    </div>
+  </div>`).join('');
+
+const STREAM_DEFS = [
+  { key: 'p_intent',           label: 'Intent',           sub: 'combined phrase evidence', w: 'beta'  },
+  { key: 'keyword_multiplier', label: 'Peak keyword',     sub: 'max indicator weight', w: 'gamma' },
+];
+$('streams').innerHTML = STREAM_DEFS.map(s => `
+  <div>
+    <div class="flex items-baseline justify-between">
+      <div><span class="text-sm font-semibold text-slate-200">${s.label}</span>
+           <span class="text-[11px] text-slate-500 ml-1.5">${s.sub}</span></div>
+      <div class="font-mono text-sm tabular text-slate-200"><span id="sv-${s.key}">0.000</span>
+           <span class="text-[11px] text-slate-500 ml-1" id="sw-${s.key}"></span></div>
+    </div>
+    <div class="mt-1.5 h-2 rounded-full bg-slate-800 overflow-hidden">
+      <div id="sb-${s.key}" class="h-full rounded-full transition-[width] duration-500 ease-out" style="width:0%;background:var(--series)"></div>
+    </div>
+  </div>`).join('');
+
+(function drawGaugeTicks() {
+  const g = $('gauge-ticks');
+  const cx = 110, cy = 110, r1 = 70, r2 = 104;
+  [THRESH.medium, THRESH.high].forEach(t => {
+    const ang = (135 + 270 * t) * Math.PI / 180;
+    const x1 = cx + r1 * Math.cos(ang), y1 = cy + r1 * Math.sin(ang);
+    const x2 = cx + r2 * Math.cos(ang), y2 = cy + r2 * Math.sin(ang);
+    g.insertAdjacentHTML('beforeend',
+      `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#0b1120" stroke-width="3"/>` +
+      `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#475569" stroke-width="1" stroke-dasharray="2 3"/>`);
+  });
+})();
+
+$('session-id').textContent = state.sessionId;
+$('link-summary').href = `${httpScheme}://${serverHost}/api/session/${state.sessionId}/summary`;
+
+// ════════════════════════════════════════════════════════════════════════
+// §4  WebSocket lifecycle
+// ════════════════════════════════════════════════════════════════════════
+function setConn(status) {
+  const map = {
+    connected:    { label: 'Connected',    color: 'var(--good)',     pulse: true },
+    connecting:   { label: 'Connecting…',  color: 'var(--warning)',  pulse: true },
+    reconnecting: { label: 'Reconnecting…',color: 'var(--warning)',  pulse: true },
+    disconnected: { label: 'Disconnected', color: 'var(--critical)', pulse: false },
+  }[status];
+  const dot = $('chip-ws').querySelector('.live-dot');
+  dot.style.color = map.color;
+  dot.classList.toggle('pulse', map.pulse);
+  $('ws-label').textContent = map.label;
+}
+
+function connect() {
+  clearTimeout(state.reconnectTimer);
+  if (state.ws && (state.ws.readyState === WebSocket.OPEN || state.ws.readyState === WebSocket.CONNECTING)) return;
+  setConn(state.reconnectDelay > RECONNECT_BASE ? 'reconnecting' : 'connecting');
+
+  const url = `${wsScheme}://${serverHost}/ws/telemetry/${state.sessionId}`;
+  const ws = new WebSocket(url);
+  ws.binaryType = 'arraybuffer';
+  state.ws = ws;
+
+  ws.onopen = () => {
+    if (ws !== state.ws) return;
+    setConn('connected');
+    state.reconnectDelay = RECONNECT_BASE;
+    state.connectedAt = Date.now();
+    logLine('client', { event: 'ws_open', url });
+    clearInterval(state.pingTimer);
+    state.pingTimer = setInterval(() => sendJson({ action: 'ping', t: performance.now() }), 5000);
+    sendJson({ action: 'ping', t: performance.now() });
+  };
+
+  ws.onmessage = ev => {
+    if (ws !== state.ws || typeof ev.data !== 'string') return;
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+    handleMessage(msg);
+  };
+
+  ws.onclose = ev => {
+    if (ws !== state.ws) return;
+    clearInterval(state.pingTimer);
+    setConn('disconnected');
+    state.rttMs = null;
+    logLine('client', { event: 'ws_close', code: ev.code, reason: ev.reason || null });
+    state.reconnectTimer = setTimeout(connect, state.reconnectDelay);
+    state.reconnectDelay = Math.min(state.reconnectDelay * 2, RECONNECT_MAX);
+  };
+
+  ws.onerror = () => { /* onclose follows and handles reconnection */ };
+}
+
+function sendBinary(buf) {
+  if (state.ws && state.ws.readyState === WebSocket.OPEN && state.ws.bufferedAmount < 2_000_000) state.ws.send(buf);
+}
+function sendJson(obj) {
+  if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.send(JSON.stringify(obj));
+}
+
+function rotateSession() {
+  state.sessionId = newSessionId();
+  $('session-id').textContent = state.sessionId;
+  $('link-summary').href = `${httpScheme}://${serverHost}/api/session/${state.sessionId}/summary`;
+  const old = state.ws;
+  state.ws = null;
+  if (old) { old.onclose = null; try { old.close(1000); } catch {} }
+  resetView();
+  state.reconnectDelay = RECONNECT_BASE;
+  connect();
+}
+
+// ---- Monitor channel: watch any live session (e.g. the Android app) ----
+function connectMonitor() {
+  const ws = new WebSocket(`${wsScheme}://${serverHost}/ws/monitor`);
+  state.monitorWs = ws;
+  ws.onopen = () => {
+    state.monitorDelay = RECONNECT_BASE;
+    if (state.viewing !== 'self') ws.send(JSON.stringify({ action: 'watch', session_id: state.viewing }));
+  };
+  ws.onmessage = ev => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+    handleMonitorMessage(msg);
+  };
+  ws.onclose = () => {
+    if (ws !== state.monitorWs) return;
+    setTimeout(connectMonitor, state.monitorDelay);
+    state.monitorDelay = Math.min(state.monitorDelay * 2, RECONNECT_MAX);
+  };
+}
+
+function handleMonitorMessage(msg) {
+  switch (msg.event) {
+    case 'sessions':
+      state.remote.clear();
+      (msg.sessions || []).forEach(s => { if (s.session_id !== state.sessionId) state.remote.set(s.session_id, s); });
+      renderSourceOptions();
+      maybeAutoFollow();
+      break;
+    case 'session_opened': {
+      const s = msg.session;
+      if (!s || s.session_id === state.sessionId) break;
+      state.remote.set(s.session_id, s);
+      renderSourceOptions();
+      logLine('server', { event: 'session_opened', session_id: s.session_id, client: s.client_kind, host: s.client_host });
+      maybeAutoFollow(s);
+      break;
+    }
+    case 'session_closed':
+      if (!state.remote.has(msg.session_id)) break;
+      state.remote.delete(msg.session_id);
+      renderSourceOptions();
+      logLine('server', { event: 'session_closed', session_id: msg.session_id });
+      if (state.viewing === msg.session_id) {
+        $('watch-text').textContent = `Session ${shortId(msg.session_id)} ended. Showing its last state.`;
+        $('alert-strip').classList.add('hidden-strip');
+      }
+      break;
+    case 'telemetry':
+      if (msg.session_id === state.viewing) {
+        const s = state.remote.get(msg.session_id);
+        if (s) { s.risk_level = msg.risk_level; s.frame_count = msg.frame_count; }
+        onTelemetry(msg);
+      }
+      break;
+  }
+}
+
+function shortId(id) { return id.length > 12 ? id.slice(0, 8) : id; }
+
+function sourceLabel(s) {
+  const kind = s.client_kind === 'android' ? 'Phone' : s.client_kind === 'browser' ? 'Browser' : 'Client';
+  return `${kind} · ${shortId(s.session_id)}${s.client_host ? ' · ' + s.client_host : ''}`;
+}
+
+function renderSourceOptions() {
+  const sel = $('source-select');
+  const items = [...state.remote.values()].sort((a, b) =>
+    (b.client_kind === 'android') - (a.client_kind === 'android') || a.uptime_s - b.uptime_s);
+  sel.innerHTML = '<option value="self">This browser</option>' +
+    items.map(s => `<option value="${esc(s.session_id)}">${esc(sourceLabel(s))}</option>`).join('');
+  if (state.viewing !== 'self' && !state.remote.has(state.viewing)) {
+    sel.insertAdjacentHTML('beforeend', `<option value="${esc(state.viewing)}">Ended · ${esc(shortId(state.viewing))}</option>`);
+  }
+  sel.value = state.viewing;
+}
+
+function maybeAutoFollow(opened) {
+  if (!$('auto-follow').checked || state.capturing || state.fileTimer) return;
+  const watchingLive = state.viewing !== 'self' && state.remote.has(state.viewing);
+  if (watchingLive) return;
+  const phone = opened && opened.client_kind === 'android'
+    ? opened
+    : [...state.remote.values()].find(s => s.client_kind === 'android');
+  if (phone) switchView(phone.session_id);
+}
+
+function switchView(target) {
+  if (target === state.viewing) return;
+  if (target !== 'self' && (state.capturing || state.fileTimer)) { stopMic(); stopFile(); }
+  state.viewing = target;
+  resetView();
+  const remote = target !== 'self';
+  if (state.monitorWs && state.monitorWs.readyState === WebSocket.OPEN) {
+    state.monitorWs.send(JSON.stringify({ action: 'watch', session_id: remote ? target : null }));
+  }
+  const s = state.remote.get(target);
+  $('watch-banner').classList.toggle('hidden', !remote);
+  $('watch-text').textContent = remote
+    ? `Watching ${s ? sourceLabel(s) : shortId(target)} — live, read-only. Audio controls apply to this browser only.`
+    : '';
+  $('session-id').textContent = remote ? shortId(target) : state.sessionId;
+  $('link-summary').href = `${httpScheme}://${serverHost}/api/session/${remote ? target : state.sessionId}/summary`;
+  ['btn-reset', 'btn-terminate', 'btn-alert-terminate', 'inject-text'].forEach(id => { $(id).disabled = remote; });
+  $('inject-form').querySelector('button').disabled = remote;
+  $('btn-alert-terminate').classList.toggle('hidden', remote);
+  renderSourceOptions();
+  logLine('client', { event: 'view', source: remote ? target : 'self' });
+}
+
+async function loadServerInfo() {
+  try {
+    const res = await fetch(`${httpScheme}://${serverHost}/api/health`, { cache: 'no-store' });
+    const info = await res.json();
+    applyEngineStatus(info.engine || {});
+    const addr = (info.lan_addresses || [])[0];
+    if (addr) {
+      $('phone-addr').textContent = `${addr}:${info.port || 8000}`;
+      $('chip-phone').classList.remove('hidden');
+    }
+  } catch { /* server unreachable; the socket status chip already says so */ }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// §5  Message handling
+// ════════════════════════════════════════════════════════════════════════
+function handleMessage(msg) {
+  switch (msg.event) {
+    case 'hello':
+      logLine('server', msg);
+      applyEngineStatus(msg.engine || {});
+      break;
+    case 'pong':
+      if (typeof msg.t === 'number') state.rttMs = performance.now() - msg.t;
+      setKpi('rtt', state.rttMs != null ? state.rttMs.toFixed(0) : '—');
+      break;
+    case 'session_terminated':
+      logLine('server', msg);
+      setTimeout(rotateSession, 400);
+      break;
+    case 'telemetry':
+    case undefined:
+      if ('risk_score' in msg && state.viewing === 'self') onTelemetry(msg);
+      break;
+    default:
+      logLine('server', msg);
+  }
+}
+
+function applyEngineStatus(engine) {
+  if (engine.risk_weights) {
+    const w = engine.risk_weights;
+    $('weights-label').textContent = `R = (${w.beta}·I + ${w.gamma}·K) / ${+(w.beta + w.gamma).toFixed(2)}`;
+    STREAM_DEFS.forEach(s => { $(`sw-${s.key}`).textContent = `×${w[s.w]}`; });
+  }
+  if (engine.thresholds) { THRESH.medium = engine.thresholds.medium; THRESH.high = engine.thresholds.high; }
+  if (engine.asr_status) setAsrChip(engine.asr_status);
+}
+
+function setAsrChip(status) {
+  const ok = status === 'ready';
+  const warn = status === 'loading' || status === 'not_loaded';
+  $('chip-asr').innerHTML = `<span style="color:${ok ? 'var(--good)' : warn ? 'var(--warning)' : 'var(--text-muted)'}">${ok ? '✓' : warn ? '…' : '—'}</span> ASR · ${esc(status.replace('_', ' '))}`;
+}
+
+function onTelemetry(d) {
+  const score = clamp01(d.risk_score);
+  const level = d.risk_level in LEVELS ? d.risk_level : levelOf(score);
+  state.lastFrame = d.frame_count ?? state.lastFrame;
+
+  renderGauge(score, level, d.speech_detected !== false);
+  renderStreams(d);
+  $('guidance').textContent = d.guidance || '—';
+  $('frame-badge').textContent = `frame ${state.lastFrame}`;
+
+  // KPIs
+  if (Number.isFinite(d.latency_ms)) {
+    state.latencies.push(d.latency_ms);
+    if (state.latencies.length > TIMELINE_POINTS) state.latencies.shift();
+    setKpi('lat', d.latency_ms.toFixed(1));
+    setKpi('p95', percentile(state.latencies, 0.95).toFixed(1));
+  }
+  if (level === 'HIGH') state.highFrames++;
+  setKpi('frames', state.lastFrame);
+  setKpi('high', state.highFrames);
+  if (d.asr_latency_ms != null) {
+    setKpi('asr', d.asr_latency_ms.toFixed(0));
+    $('asr-lat').textContent = `ASR ${d.asr_latency_ms.toFixed(0)} ms` + (d.refine_latency_ms != null ? ` · refined ${d.refine_latency_ms.toFixed(0)} ms` : '');
+  }
+  $('voiceprint-chip').classList.toggle('hidden', !d.owner_voiceprint);
+  if (d.rms_dbfs != null) $('level-db').textContent = `${d.rms_dbfs.toFixed(1)} dBFS (server)`;
+  if (d.asr_status) setAsrChip(d.asr_status);
+
+  // Timeline
+  state.timeline.push({ t: new Date(), score, level, i: d.p_intent ?? 0 });
+  if (state.timeline.length > TIMELINE_POINTS) state.timeline.shift();
+  renderTimeline();
+
+  // Indicators & transcript
+  updateIndicators(d.indicator_details || (d.indicators || []).map(tagToDetail));
+  if (d.speakers) {
+    const changed = JSON.stringify(d.speakers) !== JSON.stringify(state.speakerLabels);
+    state.speakerLabels = d.speakers;
+    if (changed && state.transcript.length) renderTranscript(false);
+  }
+  (d.transcript_chunks || []).forEach(c => upsertTranscript(c));
+  const livePartial = d.partial && d.partial.text ? d.partial : null;
+  if (JSON.stringify(livePartial) !== JSON.stringify(state.partial)) {
+    state.partial = livePartial;
+    renderTranscript(true);
+  }
+
+  // Alert strip
+  updateAlert(level, score, d);
+  state.lastLevel = level;
+
+  logLine('telemetry', d);
+}
+
+function tagToDetail(tag) {
+  const i = tag.indexOf(':');
+  return { category: i > 0 ? tag.slice(0, i) : 'urgency', phrase: i > 0 ? tag.slice(i + 1) : tag, weight: null };
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// §6  Renderers
+// ════════════════════════════════════════════════════════════════════════
+const GAUGE_LEN = 414.69;
+let shownScore = 0, gaugeAnim = null;
+
+function renderGauge(score, level, speech) {
+  const L = LEVELS[level];
+  const offset = GAUGE_LEN * (1 - score);
+  $('gauge-progress').style.strokeDashoffset = offset;
+  $('gauge-glow').style.strokeDashoffset = offset;
+  $('gauge-progress').style.stroke = L.color;
+  $('gauge-glow').style.stroke = L.color;
+  $('gauge-glow').style.opacity = level === 'HIGH' ? '.7' : '.35';
+
+  const pill = $('level-pill');
+  pill.className = `mt-2 inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-xs font-bold tracking-wider ${L.pill}`;
+  $('level-icon').textContent = L.icon;
+  $('level-label').textContent = L.label;
+  $('speech-flag').textContent = speech ? 'speech detected' : 'silence';
+
+  // Tween the number so it tracks the ring animation.
+  cancelAnimationFrame(gaugeAnim);
+  const from = shownScore, to = score, t0 = performance.now(), dur = 700;
+  const step = now => {
+    const k = Math.min(1, Math.max(0, (now - t0) / dur));
+    const e = 1 - Math.pow(1 - k, 3);
+    shownScore = from + (to - from) * e;
+    $('score-num').textContent = Math.round(shownScore * 100);
+    if (k < 1) gaugeAnim = requestAnimationFrame(step);
+  };
+  gaugeAnim = requestAnimationFrame(step);
+  // rAF is paused in background tabs; make sure the final value always lands.
+  clearTimeout(renderGauge.settle);
+  renderGauge.settle = setTimeout(() => { shownScore = to; $('score-num').textContent = Math.round(to * 100); }, dur + 50);
+}
+
+function renderStreams(d) {
+  STREAM_DEFS.forEach(s => {
+    const v = clamp01(d[s.key]);
+    $(`sv-${s.key}`).textContent = v.toFixed(3);
+    $(`sb-${s.key}`).style.width = `${(v * 100).toFixed(1)}%`;
+  });
+}
+
+function setKpi(id, value) { const el = $(`kpi-${id}`); if (el) el.textContent = value; }
+
+// ---- Timeline (single series, thresholds, crosshair tooltip) ----
+const TL = { w: 1000, h: 180, padL: 34, padR: 10, padT: 10, padB: 22 };
+
+function tlX(i) { return TL.padL + (TL.w - TL.padL - TL.padR) * (i / (TIMELINE_POINTS - 1)); }
+function tlY(v) { return TL.padT + (TL.h - TL.padT - TL.padB) * (1 - v); }
+
+function renderTimeline() {
+  const svg = $('timeline');
+  const box = svg.getBoundingClientRect();
+  TL.w = Math.max(320, box.width || 1000);
+  svg.setAttribute('viewBox', `0 0 ${TL.w} ${TL.h}`);
+
+  const pts = state.timeline;
+  const offset = TIMELINE_POINTS - pts.length;
+  let out = '';
+
+  // Recessive grid + y labels
+  [0, 0.5, 1].forEach(v => {
+    out += `<line x1="${TL.padL}" x2="${TL.w - TL.padR}" y1="${tlY(v)}" y2="${tlY(v)}" stroke="#1e293b" stroke-width="1"/>`;
+    out += `<text x="${TL.padL - 8}" y="${tlY(v) + 4}" text-anchor="end" font-size="10" fill="#64748b" font-family="JetBrains Mono, monospace">${v.toFixed(1)}</text>`;
+  });
+  // Threshold lines (labelled, status colour + text label)
+  [['high', THRESH.high, '#d03b3b', 'HIGH'], ['medium', THRESH.medium, '#fab219', 'MED']].forEach(([, v, c, lbl]) => {
+    out += `<line x1="${TL.padL}" x2="${TL.w - TL.padR}" y1="${tlY(v)}" y2="${tlY(v)}" stroke="${c}" stroke-opacity=".55" stroke-width="1" stroke-dasharray="4 4"/>`;
+    out += `<text x="${TL.padL + 6}" y="${tlY(v) - 4}" font-size="10" fill="#94a3b8" font-family="Inter, sans-serif">${lbl} ${v.toFixed(2)}</text>`;
+  });
+  // x labels
+  out += `<text x="${TL.padL}" y="${TL.h - 6}" font-size="10" fill="#64748b" font-family="Inter, sans-serif">−60 s</text>`;
+  out += `<text x="${TL.w - TL.padR}" y="${TL.h - 6}" text-anchor="end" font-size="10" fill="#64748b" font-family="Inter, sans-serif">now</text>`;
+
+  if (pts.length > 1) {
+    const coords = pts.map((p, i) => [tlX(i + offset), tlY(p.score)]);
+    const line = coords.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join('');
+    const area = `${line}L${coords[coords.length - 1][0].toFixed(1)},${tlY(0)}L${coords[0][0].toFixed(1)},${tlY(0)}Z`;
+    out += `<defs><linearGradient id="tl-fill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0" stop-color="#3987e5" stop-opacity=".28"/><stop offset="1" stop-color="#3987e5" stop-opacity="0"/>
+            </linearGradient></defs>`;
+    out += `<path d="${area}" fill="url(#tl-fill)"/>`;
+    out += `<path d="${line}" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const [lx, ly] = coords[coords.length - 1];
+    out += `<circle cx="${lx}" cy="${ly}" r="4.5" fill="#3987e5" stroke="#0f172a" stroke-width="2"/>`;
+  }
+  out += `<g id="tl-cross" visibility="hidden">
+            <line id="tl-cross-line" y1="${TL.padT}" y2="${TL.h - TL.padB}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 3"/>
+            <circle id="tl-cross-dot" r="5" fill="#3987e5" stroke="#0f172a" stroke-width="2"/>
+          </g>`;
+  out += `<rect id="tl-hit" x="${TL.padL}" y="0" width="${TL.w - TL.padL - TL.padR}" height="${TL.h}" fill="transparent"/>`;
+  svg.innerHTML = out;
+}
+
+(function bindTimelineHover() {
+  const svg = $('timeline'), tip = $('timeline-tip'), wrap = $('timeline-wrap');
+  svg.addEventListener('mousemove', ev => {
+    const pts = state.timeline;
+    if (!pts.length) return;
+    const rect = svg.getBoundingClientRect();
+    const x = (ev.clientX - rect.left) * (TL.w / rect.width);
+    const offset = TIMELINE_POINTS - pts.length;
+    const raw = Math.round(((x - TL.padL) / (TL.w - TL.padL - TL.padR)) * (TIMELINE_POINTS - 1)) - offset;
+    const idx = Math.max(0, Math.min(pts.length - 1, raw));
+    const p = pts[idx];
+    const cx = tlX(idx + offset), cy = tlY(p.score);
+    const cross = $('tl-cross'); if (!cross) return;
+    cross.setAttribute('visibility', 'visible');
+    $('tl-cross-line').setAttribute('x1', cx); $('tl-cross-line').setAttribute('x2', cx);
+    $('tl-cross-dot').setAttribute('cx', cx); $('tl-cross-dot').setAttribute('cy', cy);
+    const L = LEVELS[p.level];
+    tip.innerHTML = `
+      <div class="font-mono text-slate-400">${fmtTime(p.t)}</div>
+      <div class="mt-1 flex items-center gap-2"><span class="text-slate-100 font-bold text-sm tabular">${(p.score * 100).toFixed(0)}%</span>
+        <span class="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 rounded ${L.pill}">${L.icon} ${L.label}</span></div>
+      <div class="mt-1 font-mono text-slate-400 tabular">intent ${p.i.toFixed(3)}</div>`;
+    tip.classList.remove('hidden');
+    const px = (cx / TL.w) * rect.width;
+    const tw = tip.offsetWidth;
+    tip.style.left = `${Math.min(rect.width - tw, Math.max(0, px + 12 > rect.width - tw ? px - tw - 12 : px + 12))}px`;
+    tip.style.top = `8px`;
+  });
+  svg.addEventListener('mouseleave', () => {
+    tip.classList.add('hidden');
+    const cross = $('tl-cross'); if (cross) cross.setAttribute('visibility', 'hidden');
+  });
+  window.addEventListener('resize', renderTimeline);
+})();
+
+// ---- Indicators ----
+function updateIndicators(details) {
+  const now = new Date();
+  const current = new Set();
+  details.forEach(d => {
+    const tag = `${d.category}:${d.phrase}`;
+    current.add(tag);
+    state.hitPhrases.add(d.phrase.toLowerCase());
+    const prev = state.indicators.get(tag);
+    if (prev) { prev.count++; prev.last = now; }
+    else state.indicators.set(tag, { ...d, count: 1, first: now, last: now });
+  });
+  const box = $('indicators');
+  if (!state.indicators.size) { box.innerHTML = '<div class="text-slate-600 text-sm italic">None yet.</div>'; return; }
+  const rows = [...state.indicators.entries()].sort((a, b) => (current.has(b[0]) - current.has(a[0])) || (b[1].last - a[1].last));
+  box.innerHTML = rows.map(([tag, d]) => {
+    const active = current.has(tag);
+    return `<div class="flex items-center gap-3 rounded-lg border ${active ? 'border-red-900/70 bg-red-950/30' : 'border-slate-800 bg-slate-950/40'} px-3 py-2">
+      <span class="w-1.5 self-stretch rounded-full" style="background:${active ? 'var(--critical)' : '#334155'}"></span>
+      <div class="min-w-0 flex-1">
+        <div class="font-mono text-[13px] text-slate-100 truncate">“${esc(d.phrase)}”</div>
+        <div class="text-[11px] text-slate-500">${esc(CATEGORY_LABEL[d.category] || d.category)}${active ? ' · <span class="text-red-300 font-semibold">active</span>' : ''}</div>
+      </div>
+      <div class="text-right font-mono text-[11px] text-slate-400 tabular shrink-0">
+        ${d.weight != null ? `w ${Number(d.weight).toFixed(2)}<br>` : ''}${d.count} win
+      </div>
+    </div>`;
+  }).join('');
+  $('ind-count').textContent = `${state.indicators.size} unique`;
+  // Re-highlight the transcript with any newly seen phrases.
+  if (details.length) renderTranscript(false);
+}
+
+// ---- Transcript ----
+// Server chunks: first-pass text arrives with final=false and is replaced in place when the
+// accurate pass finishes (same seq).
+function upsertTranscript(c) {
+  const existing = c.seq != null ? state.transcript.find(l => l.seq === c.seq) : null;
+  if (existing) {
+    Object.assign(existing, { text: c.text, language: c.language || existing.language, final: c.final !== false,
+                              speakerId: c.speaker_id ?? existing.speakerId, keywords: c.keywords || [] });
+    renderTranscript(false);
+    return;
+  }
+  addTranscript(c.text, c.source, new Date(c.timestamp || Date.now()), c.language,
+    { speakerId: c.speaker_id, startS: c.start_s, endS: c.end_s, seq: c.seq, final: c.final !== false,
+      keywords: c.keywords || [] });
+}
+
+function addTranscript(text, source, when, language, turn = {}) {
+  if (!text || !text.trim()) return;
+  state.transcript.push({
+    text: text.trim(), source: source || 'asr', t: when, language: language || null,
+    speakerId: turn.speakerId ?? null, startS: turn.startS ?? null, endS: turn.endS ?? null,
+    seq: turn.seq ?? null, final: turn.final !== false, keywords: turn.keywords || [],
+  });
+  if (state.transcript.length > TRANSCRIPT_MAX) state.transcript.shift();
+  renderTranscript(true);
+}
+
+function fmtCallTime(seconds) {
+  const s = Math.max(0, Math.floor(seconds));
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function renderTranscript(append) {
+  const box = $('transcript');
+  const stick = nearBottom(box);
+  if (!state.transcript.length && !state.partial) { box.innerHTML = '<div class="text-slate-600 italic">Waiting for speech…</div>'; return; }
+  const phraseRe = list => {
+    const phrases = [...new Set(list)].filter(Boolean).sort((a, b) => b.length - a.length);
+    return phrases.length ? new RegExp(`(?<![\\w'\u0900-\u097f])(${phrases.map(p => escRe(esc(p)).replace(/ /g, '[\\s,.!?।]+')).join('|')})(?![\\w'\u0900-\u097f])`, 'gi') : null;
+  };
+  const globalPhrases = [...state.hitPhrases];
+  const LANG = { hinglish: 'Hinglish', hi: 'Hindi', en: 'English' };
+  box.innerHTML = state.transcript.map(line => {
+    let html = esc(line.text);
+    const re = phraseRe(globalPhrases.concat(line.keywords || []));
+    if (re) html = html.replace(re, '<mark class="hit">$1</mark>');
+    const label = line.source === 'client' ? 'Reference'
+      : (line.speakerId != null ? (state.speakerLabels[String(line.speakerId)] || `Speaker ${line.speakerId + 1}`) : 'Speaker');
+    const side = label === 'You' ? 'turn-you' : 'turn-caller';
+    const when = line.startS != null ? fmtCallTime(line.startS) : fmtTime(line.t);
+    const lang = line.language ? `<span>${esc(LANG[line.language] || line.language)}</span>` : '';
+    const draft = line.final === false ? ' provisional' : '';
+    return `<div class="turn ${side}${draft}">
+      <div class="turn-meta"><span class="who">${esc(label)}</span><span class="tabular">${when}</span>${lang}${draft ? '<span>refining</span>' : ''}</div>
+      <div class="bubble text-slate-100" title="${esc(fmtTime(line.t))}">${html}</div>
+    </div>`;
+  }).join('') + (state.partial ? (() => {
+    const p = state.partial;
+    const who = p.speaker || 'Speaking';
+    return `<div class="turn ${who === 'You' ? 'turn-you' : 'turn-caller'} live">
+      <div class="turn-meta"><span class="who">${esc(who)}</span><span class="tabular">${fmtCallTime(p.start_s || 0)}</span><span class="live-dots">live</span></div>
+      <div class="bubble text-slate-200">${(() => { const r = phraseRe(globalPhrases.concat(p.keywords || [])); return r ? esc(p.text).replace(r, '<mark class="hit">$1</mark>') : esc(p.text); })()}</div>
+    </div>`;
+  })() : '');
+  if (stick || append) box.scrollTop = box.scrollHeight;
+}
+
+// ---- Telemetry log ----
+function logLine(kind, obj) {
+  state.logCount++;
+  $('log-count').textContent = `${state.logCount} events`;
+  if (state.logPaused) return;
+  const box = $('log');
+  const stick = nearBottom(box);
+  const color = kind === 'telemetry' ? 'text-sky-400' : kind === 'server' ? 'text-violet-400' : 'text-slate-500';
+  const row = document.createElement('div');
+  row.innerHTML = `<span class="text-slate-600">${fmtTime(new Date())}</span> <span class="${color}">${kind.padEnd(9)}</span> ${highlightJson(obj)}`;
+  box.appendChild(row);
+  while (box.childElementCount > LOG_MAX) box.firstElementChild.remove();
+  if (stick) box.scrollTop = box.scrollHeight;
+}
+
+// ---- Alert strip ----
+function updateAlert(level, score, d) {
+  const strip = $('alert-strip');
+  if (level === 'HIGH') {
+    if (state.lastLevel !== 'HIGH') state.alertDismissedAtFrame = -1;   // new episode re-arms the alert
+    const cats = [...new Set((d.indicator_details || []).map(x => CATEGORY_LABEL[x.category] || x.category))];
+    $('alert-detail').textContent = `Risk ${(score * 100).toFixed(0)}%` + (cats.length ? ` · ${cats.join(' · ')}` : '') +
+      ` · intent ${clamp01(d.p_intent).toFixed(2)}`;
+    if (state.alertDismissedAtFrame < 0) strip.classList.remove('hidden-strip');
+  } else {
+    strip.classList.add('hidden-strip');
+  }
+}
+
+function resetView() {
+  state.timeline = []; state.latencies = []; state.highFrames = 0; state.lastFrame = 0;
+  state.indicators.clear(); state.hitPhrases.clear(); state.transcript = []; state.speakerLabels = {}; state.partial = null;
+  state.lastLevel = 'STANDBY';
+  renderTimeline(); updateIndicators([]); renderTranscript(false);
+  renderGauge(0, 'STANDBY', false);
+  $('speech-flag').textContent = 'no audio';
+  STREAM_DEFS.forEach(s => { $(`sv-${s.key}`).textContent = '0.000'; $(`sb-${s.key}`).style.width = '0%'; });
+  KPI_DEFS.forEach(k => setKpi(k.id, '—'));
+  $('guidance').textContent = 'Awaiting first analysis window…';
+  $('alert-strip').classList.add('hidden-strip');
+  $('ind-count').textContent = '0 unique';
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// §7  Audio capture → 16 kHz Int16 hops
+// ════════════════════════════════════════════════════════════════════════
+class StreamingResampler {
+  // Linear-interpolation resampler that keeps phase across blocks.
+  constructor(inRate, outRate) { this.step = inRate / outRate; this.pos = 0; this.last = 0; }
+  process(input) {
+    if (this.step === 1) return input.slice();
+    const out = [];
+    // Virtual signal: [last, ...input]; pos is measured from `last`.
+    while (this.pos < input.length) {
+      const i = Math.floor(this.pos), f = this.pos - i;
+      const a = i === 0 ? this.last : input[i - 1];
+      const b = input[i];
+      out.push(a + (b - a) * f);
+      this.pos += this.step;
+    }
+    this.pos -= input.length;
+    this.last = input[input.length - 1];
+    return Float32Array.from(out);
+  }
+}
+
+function floatToInt16(frame) {
+  const out = new Int16Array(frame.length);
+  for (let i = 0; i < frame.length; i++) {
+    const s = Math.max(-1, Math.min(1, frame[i]));
+    out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return out;
+}
+
+function pushSamples(samples16k) {
+  const merged = new Float32Array(state.pending.length + samples16k.length);
+  merged.set(state.pending); merged.set(samples16k, state.pending.length);
+  let offset = 0;
+  while (merged.length - offset >= HOP_SAMPLES) {
+    sendBinary(floatToInt16(merged.subarray(offset, offset + HOP_SAMPLES)).buffer);
+    offset += HOP_SAMPLES;
+  }
+  state.pending = merged.slice(offset);
+}
+
+function updateMeter(block) {
+  let sum = 0;
+  for (let i = 0; i < block.length; i++) sum += block[i] * block[i];
+  const rms = Math.sqrt(sum / Math.max(1, block.length));
+  const db = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
+  const pct = Number.isFinite(db) ? Math.max(0, Math.min(100, (db + 60) / 60 * 100)) : 0;
+  $('level-bar').style.width = `${pct}%`;
+  $('level-db').textContent = Number.isFinite(db) ? `${db.toFixed(1)} dBFS (local)` : '−∞ dBFS';
+}
+
+const WORKLET_SRC = `
+class TapProcessor extends AudioWorkletProcessor {
+  constructor() { super(); this.buf = new Float32Array(2048); this.n = 0; }
+  process(inputs) {
+    const ch = inputs[0] && inputs[0][0];
+    if (ch) {
+      for (let i = 0; i < ch.length; i++) {
+        this.buf[this.n++] = ch[i];
+        if (this.n === this.buf.length) { this.port.postMessage(this.buf.slice(0)); this.n = 0; }
+      }
+    }
+    return true;
+  }
+}
+registerProcessor('tap-processor', TapProcessor);`;
+
+async function startMic() {
+  if (state.fileTimer) stopFile();
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    alert('Browsers only allow microphone capture on HTTPS or http://localhost. Open the dashboard on the server machine at http://localhost:8000, or use "Stream a benchmark file" / the phone app instead.');
+    return;
+  }
+  try {
+    state.micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: false, autoGainControl: true },
+    });
+  } catch (e) {
+    alert('Microphone access was denied.');
+    return;
+  }
+
+  // Prefer a native 16 kHz context; fall back to the device rate + JS resampling
+  // (Firefox refuses to connect a mic stream to a context at a different rate).
+  let ctx;
+  try {
+    ctx = new AudioContext({ sampleRate: TARGET_SR });
+    state.srcNode = ctx.createMediaStreamSource(state.micStream);
+  } catch {
+    if (ctx) ctx.close();
+    ctx = new AudioContext();
+    state.srcNode = ctx.createMediaStreamSource(state.micStream);
+  }
+  state.audioCtx = ctx;
+  state.resampler = new StreamingResampler(ctx.sampleRate, TARGET_SR);
+  state.pending = new Float32Array(0);
+
+  const onBlock = block => {
+    updateMeter(block);
+    pushSamples(state.resampler.process(block));
+  };
+
+  try {
+    const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
+    await ctx.audioWorklet.addModule(url);
+    URL.revokeObjectURL(url);
+    state.workletNode = new AudioWorkletNode(ctx, 'tap-processor');
+    state.workletNode.port.onmessage = ev => onBlock(ev.data);
+    state.srcNode.connect(state.workletNode);
+  } catch {
+    // Legacy fallback for browsers without AudioWorklet.
+    state.procNode = ctx.createScriptProcessor(4096, 1, 1);
+    state.procNode.onaudioprocess = ev => onBlock(ev.inputBuffer.getChannelData(0));
+    state.srcNode.connect(state.procNode);
+    state.procNode.connect(ctx.destination);
+  }
+
+  state.capturing = true;
+  const btn = $('btn-mic');
+  btn.setAttribute('aria-pressed', 'true');
+  btn.setAttribute('aria-label', 'Stop microphone');
+  btn.classList.add('ring-2', 'ring-red-500', 'bg-red-950/60');
+  $('mic-icon').classList.replace('text-slate-300', 'text-red-300');
+  $('mic-label').textContent = `Streaming microphone · ${ctx.sampleRate / 1000} kHz → 16 kHz`;
+}
+
+function stopMic() {
+  state.workletNode?.disconnect(); state.workletNode = null;
+  state.procNode?.disconnect(); state.procNode = null;
+  state.srcNode?.disconnect(); state.srcNode = null;
+  state.audioCtx?.close(); state.audioCtx = null;
+  state.micStream?.getTracks().forEach(t => t.stop()); state.micStream = null;
+  state.capturing = false;
+  const btn = $('btn-mic');
+  btn.setAttribute('aria-pressed', 'false');
+  btn.setAttribute('aria-label', 'Start microphone');
+  btn.classList.remove('ring-2', 'ring-red-500', 'bg-red-950/60');
+  $('mic-icon').classList.replace('text-red-300', 'text-slate-300');
+  $('mic-label').textContent = 'Microphone idle';
+  $('level-bar').style.width = '0%';
+}
+
+// ---- Benchmark file streaming ----
+async function loadFile(file) {
+  $('file-label').textContent = `Decoding ${file.name}…`;
+  $('btn-file').disabled = true;
+  try {
+    const bytes = await file.arrayBuffer();
+    const decodeCtx = new AudioContext();
+    const decoded = await decodeCtx.decodeAudioData(bytes);
+    decodeCtx.close();
+    const frames = Math.ceil(decoded.duration * TARGET_SR);
+    const offline = new OfflineAudioContext(1, frames, TARGET_SR);
+    const src = offline.createBufferSource();
+    src.buffer = decoded; src.connect(offline.destination); src.start();
+    const rendered = await offline.startRendering();
+    state.fileSamples = rendered.getChannelData(0);
+    $('file-label').textContent = `${file.name} · ${decoded.duration.toFixed(1)} s · ${decoded.sampleRate / 1000} kHz → 16 kHz mono`;
+    $('btn-file').disabled = false;
+  } catch (e) {
+    state.fileSamples = null;
+    $('file-label').textContent = `Could not decode ${file.name}`;
+  }
+}
+
+function startFile() {
+  if (!state.fileSamples) return;
+  if (state.capturing) stopMic();
+  sendJson({ action: 'reset' });
+  state.fileOffset = 0;
+  const speed = Number($('file-speed').value) || 1;
+  $('btn-file').textContent = 'Stop';
+  state.fileTimer = setInterval(() => {
+    const s = state.fileSamples;
+    if (state.fileOffset >= s.length) { stopFile(true); return; }
+    const hop = s.subarray(state.fileOffset, Math.min(s.length, state.fileOffset + HOP_SAMPLES));
+    updateMeter(hop);
+    const padded = new Float32Array(HOP_SAMPLES); padded.set(hop);
+    sendBinary(floatToInt16(padded).buffer);
+    state.fileOffset += HOP_SAMPLES;
+    $('file-progress').style.width = `${Math.min(100, state.fileOffset / s.length * 100).toFixed(1)}%`;
+  }, 500 / speed);
+}
+
+function stopFile(done = false) {
+  clearInterval(state.fileTimer); state.fileTimer = null;
+  $('btn-file').textContent = 'Stream file';
+  $('level-bar').style.width = '0%';
+  if (done) logLine('client', { event: 'file_stream_complete', seconds: +(state.fileOffset / TARGET_SR).toFixed(1) });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// §8  Controls
+// ════════════════════════════════════════════════════════════════════════
+function terminate() {
+  stopMic(); stopFile();
+  sendJson({ action: 'terminate' });
+  addTranscript('—— session terminated by analyst ——', 'client', new Date());
+  $('alert-strip').classList.add('hidden-strip');
+}
+
+$('btn-mic').addEventListener('click', () => {
+  if (state.capturing) { stopMic(); return; }
+  if (state.viewing !== 'self') switchView('self');
+  startMic();
+});
+$('source-select').addEventListener('change', ev => switchView(ev.target.value));
+$('btn-watch-self').addEventListener('click', () => switchView('self'));
+$('btn-terminate').addEventListener('click', terminate);
+$('btn-alert-terminate').addEventListener('click', terminate);
+$('btn-alert-dismiss').addEventListener('click', () => {
+  state.alertDismissedAtFrame = state.lastFrame;
+  $('alert-strip').classList.add('hidden-strip');
+});
+$('btn-reset').addEventListener('click', () => { sendJson({ action: 'reset' }); logLine('client', { action: 'reset' }); });
+$('btn-log-pause').addEventListener('click', ev => {
+  state.logPaused = !state.logPaused;
+  ev.currentTarget.textContent = state.logPaused ? 'Resume' : 'Pause';
+  ev.currentTarget.setAttribute('aria-pressed', String(state.logPaused));
+});
+$('btn-log-clear').addEventListener('click', () => { $('log').innerHTML = ''; state.logCount = 0; $('log-count').textContent = '0 events'; });
+$('btn-clear-transcript').addEventListener('click', () => { state.transcript = []; renderTranscript(false); });
+$('btn-swap-speakers').addEventListener('click', () => {
+  if (state.viewing === 'self') sendJson({ action: 'swap_speakers' });
+  else if (state.monitorWs && state.monitorWs.readyState === WebSocket.OPEN) {
+    state.monitorWs.send(JSON.stringify({ action: 'swap_speakers', session_id: state.viewing }));
+  }
+  logLine('client', { action: 'swap_speakers', session: state.viewing });
+});
+$('inject-form').addEventListener('submit', ev => {
+  ev.preventDefault();
+  const text = $('inject-text').value.trim();
+  if (!text) return;
+  sendJson({ action: 'transcript', text });
+  logLine('client', { action: 'transcript', chars: text.length });
+  $('inject-text').value = '';
+});
+$('file-input').addEventListener('change', ev => { const f = ev.target.files?.[0]; if (f) loadFile(f); });
+$('btn-file').addEventListener('click', () => {
+  if (state.fileTimer) { stopFile(); return; }
+  if (state.viewing !== 'self') switchView('self');
+  startFile();
+});
+
+setInterval(() => {
+  if (!state.connectedAt || !state.ws || state.ws.readyState !== WebSocket.OPEN) return;
+  const s = Math.floor((Date.now() - state.connectedAt) / 1000);
+  $('uptime').textContent = [s / 3600, (s % 3600) / 60, s % 60].map(v => String(Math.floor(v)).padStart(2, '0')).join(':');
+}, 1000);
+
+// ════════════════════════════════════════════════════════════════════════
+// §9  Boot
+// ════════════════════════════════════════════════════════════════════════
+renderTimeline();
+renderGauge(0, 'STANDBY', false);
+$('speech-flag').textContent = 'no audio';
+connect();
+connectMonitor();
+loadServerInfo();
+</script>
+</body>
+</html>
