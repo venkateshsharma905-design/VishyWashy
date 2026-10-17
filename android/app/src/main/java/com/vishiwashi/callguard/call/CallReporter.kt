@@ -14,8 +14,8 @@ import java.io.IOException
 /**
  * Hands a just-finished scam call to the cyber cell. By policy the call recording is never
  * exported to the user as a file they could keep: it stays on the server for two minutes and is
- * delivered to the cyber cell only, as a secure link inside a message addressed to the fixed
- * cyber-cell number. This builds that message (addressed, pre-filled) for the user to send; no
+ * delivered to the cyber cell only, as a secure link inside a message addressed to the
+ * user-configured cyber-cell number. This builds that message (addressed, pre-filled) for the user to send; no
  * audio file is downloaded to the phone and no general share sheet is offered.
  */
 class CallReporter(

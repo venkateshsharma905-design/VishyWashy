@@ -690,12 +690,26 @@ class HudControlActivity : ComponentActivity() {
         card(column) {
             wrap(neu.title("Report to cyber cell", 15f))
             wrap(neu.body("When you report a flagged call, VishyWashy opens the share sheet addressed to " +
-                "this number. You choose the app and send it yourself."), 4)
-            wrap(neu.title(settings.reportNumber, 18f, palette.accent).apply {
-                setTextIsSelectable(false)
-                contentDescription = "Cyber cell number ${settings.reportNumber}"
-            }, 12)
-            wrap(neu.body("This number is fixed and can't be changed.", 12f), 4)
+                "this number. You choose the app and send it yourself. Enter your local cyber-cell " +
+                "number, e.g. +91 1930."), 4)
+            val input = inputField("+91 1930", InputType.TYPE_CLASS_PHONE)
+            input.setText(settings.reportNumber)
+            wrap(input, 12)
+            val status = neu.body("")
+            wrap(neu.button("Save number", color = palette.accent) {
+                val value = input.text.toString().trim()
+                val digits = value.filter { it.isDigit() || it == '+' }
+                if (digits.count { it.isDigit() } < 3) {
+                    status.text = "Enter a valid phone number."
+                    status.setTextColor(palette.danger)
+                } else {
+                    settings.reportNumber = value
+                    status.text = "Saved. Reports will be addressed to $value."
+                    status.setTextColor(palette.success)
+                    neu.haptic(input, strong = true)
+                }
+            }, 10)
+            wrap(status, 8)
         }
     }
 

@@ -60,19 +60,20 @@ class ProtectionSettings(context: Context) {
         get() = prefs.getBoolean(KEY_SENIOR, false)
         set(value) = prefs.edit().putBoolean(KEY_SENIOR, value).apply()
 
-    /** Where "Report to cyber cell" is addressed. Fixed: it cannot be changed in the app, so a
-     *  scammer can't talk the user into redirecting reports (a number saved by older versions
-     *  is ignored). */
-    val reportNumber: String
-        get() = DEFAULT_REPORT_NUMBER
+    /** Where "Report to cyber cell" is addressed. The user sets this in Settings; until they do it
+     *  is empty and the report flow asks them to add it. Stored only on this phone. */
+    var reportNumber: String
+        get() = prefs.getString(KEY_REPORT_NUMBER, DEFAULT_REPORT_NUMBER) ?: DEFAULT_REPORT_NUMBER
+        set(value) = prefs.edit().putString(KEY_REPORT_NUMBER, value.trim()).apply()
 
     companion object {
         const val VOICEPRINT_DIMS = 192
         const val THEME_SYSTEM = "system"
         const val THEME_LIGHT = "light"
         const val THEME_DARK = "dark"
-        /** Cyber-cell report destination (fixed). */
-        const val DEFAULT_REPORT_NUMBER = "+91 8383853196"
+        /** No cyber-cell number ships with the app; the user enters their own in Settings. */
+        const val DEFAULT_REPORT_NUMBER = ""
+        private const val KEY_REPORT_NUMBER = "report_number"
         private const val KEY_THEME = "theme_mode"
         private const val KEY_SENIOR = "senior_mode"
         private const val KEY_VOICEPRINT = "owner_voiceprint"

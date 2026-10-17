@@ -39,7 +39,7 @@ and warns you, or puts the call on hold, before you share anything.
 | ⏸️ **Hold call on fraud** | At 70% risk the app presses the dialer's **Hold** (or **Mute**) and asks: *continue* or *hang up*? |
 | 🔊 **Hears both sides** | Switches the call to loudspeaker automatically (click, then real tap, verified after each) so the microphone hears the caller. |
 | 🧓 **Senior mode** | On high risk the call is ended for you and the report is opened — one tap, no decisions. |
-| 🚨 **Report to cyber cell** | After a flagged call: transcript + recording, pre-addressed to the cyber-cell number, sent by you through the share sheet. |
+| 🚨 **Report to cyber cell** | After a flagged call: transcript + recording, pre-addressed to the cyber-cell number you set in Settings, sent by you through the share sheet. |
 | ✅ **Trusted numbers** | Calls from trusted numbers or contacts are never recorded or analysed. Removing one can be undone. |
 | 🕒 **History** | Every watched call with time, caller, duration, outcome and a peak-risk bar. Never any audio. |
 | 📊 **SOC dashboard** | Browser console with the live risk gauge, risk timeline, colour-coded transcript (the caller's scam words highlighted), indicators and latency. |
@@ -215,7 +215,7 @@ adb reverse tcp:8000 tcp:8000
 | Microphone source | Auto | Leave on **Auto**. Only if the caller's words never appear on SIM calls: try **Dual**, then **Camcorder** or **Raw**. |
 | Appearance | System | System / Light / Dark. |
 | Senior mode | Off | On high risk, end the call automatically and open the report. |
-| Report to cyber cell | fixed | Reports go to **+91 8383853196** (fixed, can't be changed in the app). |
+| Report to cyber cell | — | Enter your local cyber-cell / helpline number (e.g. `+91 1930`). Saved only on the phone; reports are addressed to it. |
 
 ---
 

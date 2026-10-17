@@ -31,9 +31,16 @@ class ReportActivity : ComponentActivity() {
             return
         }
 
+        val reportNumber = ProtectionSettings(this).reportNumber
+        if (reportNumber.isBlank()) {
+            Toast.makeText(this, "Add a cyber-cell number in Settings before reporting.", Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
+
         Toast.makeText(this, "Preparing report…", Toast.LENGTH_SHORT).show()
         val reporter = CallReporter(applicationContext, AudioStreamManager.defaultHttpClient())
-        reporter.prepare(endpoint, sessionId, token, ProtectionSettings(this).reportNumber, object : CallReporter.Listener {
+        reporter.prepare(endpoint, sessionId, token, reportNumber, object : CallReporter.Listener {
             override fun onReady(shareIntent: Intent) {
                 CallHistory(this@ReportActivity).setOutcome(sessionId, CallHistory.Outcome.REPORTED)
                 startActivity(shareIntent)
